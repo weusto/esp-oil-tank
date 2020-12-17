@@ -179,9 +179,9 @@ void setup() {
     }
   } 
 
-  Serial.begin(9600);               // initialize the serial monitor
-  pinMode(trigPin, OUTPUT);         // set the trigger pin as output
-  pinMode(echoPin, INPUT);          // set the echo pin as input
+  Serial.begin(9600);                   // initialize the serial monitor
+  pinMode(trigPin, OUTPUT);             // set the trigger pin as output
+  pinMode(echoPin, INPUT);              // set the echo pin as input
 }
 
 void loop() {
