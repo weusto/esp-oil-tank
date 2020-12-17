@@ -167,8 +167,36 @@ const int echoPin = 17;   // echo pin
 float duration;           // variable to store the duration as float
 float distance;           // variable to store the distance as float
 
+/* 
+ * Show current device version
+ */
+void handleRoot() {  
+  server.send(200, "text/plain", "v" + String(CURRENT_VERSION));
+}
+
 void setup() {
-    // Check if we need to download a new version
+  Serial.begin(115200);
+  Serial.setDebugOutput(true);  
+  pinMode(LED_BUILTIN, OUTPUT);
+
+  delay(3000);
+  Serial.println("\n Starting");
+  // Setup Wifi Manager
+  String version = String("<p>Current Version - v") + String(CURRENT_VERSION) + String("</p>");
+  USE_SERIAL.println(version);
+  
+  WiFiManager wm;
+  WiFiManagerParameter versionText(version.c_str());
+  wm.addParameter(&versionText);    
+    
+  if (!wm.autoConnect()) {
+    Serial.println("failed to connect and hit timeout");
+    //reset and try again, or maybe put it to deep sleep
+    ESP.restart();
+    delay(1000);
+  }
+ 
+  // Check if we need to download a new version
   String downloadUrl = getDownloadUrl();
   if (downloadUrl.length() > 0)
   {
@@ -177,9 +205,15 @@ void setup() {
     {
       USE_SERIAL.println("Error updating device");
     }
-  } 
+  }
 
-  Serial.begin(9600);                   // initialize the serial monitor
+  server.on("/", handleRoot);
+  server.begin();
+  USE_SERIAL.println("HTTP server started");
+
+  USE_SERIAL.print("IP address: ");
+  USE_SERIAL.println(WiFi.localIP());
+
   pinMode(trigPin, OUTPUT);             // set the trigger pin as output
   pinMode(echoPin, INPUT);               // set the echo pin as input
 }
@@ -195,8 +229,7 @@ void loop() {
   duration = pulseIn(echoPin, HIGH);     // request how long the echoPin has been HIGH
   distance = (duration * 0.0343) / 2;    // calculate the distance based on the speed of sound
                                          // we need to divide by 2 since the sound travelled the distance twice
-  Serial.print("Distance: ");            // Print the result to the serial monitor
-  Serial.println(distance);
+  USE_SERIAL.println("Distance #: " + String(distance));           // Print the result to the serial monitor
 
   delay(100);                            // pause 100ms till the next measurement
 
