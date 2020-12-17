@@ -180,12 +180,12 @@ void setup() {
   } 
 
   Serial.begin(9600);                   // initialize the serial monitor
-  pinMode(trigPin, OUTPUT);             // set the trigger pin as output
-  pinMode(echoPin, INPUT);              // set the echo pin as input
+  /*pinMode(trigPin, OUTPUT);             // set the trigger pin as output
+  pinMode(echoPin, INPUT);              // set the echo pin as input*/
 }
 
 void loop() {
-  digitalWrite(trigPin, LOW);            // set the trigPin to LOW
+  /*digitalWrite(trigPin, LOW);            // set the trigPin to LOW
   delayMicroseconds(2);                  // wait 2ms to make sure the trigPin is LOW
 
   digitalWrite(trigPin, HIGH);           // set the trigPin to HIGH to start sending ultrasonic sound
@@ -198,7 +198,7 @@ void loop() {
   Serial.print("Distance: ");            // Print the result to the serial monitor
   Serial.println(distance);
 
-  delay(100);                            // pause 100ms till the next measurement
+  delay(100);                            // pause 100ms till the next measurement*/
 
   // Just chill
   server.handleClient();
