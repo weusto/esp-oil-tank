@@ -19,7 +19,7 @@
 #define USE_SERIAL Serial
 
 #define CURRENT_VERSION VERSION
-#define CLOUD_FUNCTION_URL "http://us-central1-gcloud-ota-update.cloudfunctions.net/getDownloadUrl"
+#define CLOUD_FUNCTION_URL "https://us-central1-oil-tank-298920.cloudfunctions.net/getDownloadUrl"
 
 WiFiClient client;
 #if defined(ESP8266)
@@ -180,12 +180,12 @@ void setup() {
   } 
 
   Serial.begin(9600);                   // initialize the serial monitor
-  /*pinMode(trigPin, OUTPUT);             // set the trigger pin as output
-  pinMode(echoPin, INPUT);              // set the echo pin as input*/
+  pinMode(trigPin, OUTPUT);             // set the trigger pin as output
+  pinMode(echoPin, INPUT);               // set the echo pin as input
 }
 
 void loop() {
-  /*digitalWrite(trigPin, LOW);            // set the trigPin to LOW
+  digitalWrite(trigPin, LOW);            // set the trigPin to LOW
   delayMicroseconds(2);                  // wait 2ms to make sure the trigPin is LOW
 
   digitalWrite(trigPin, HIGH);           // set the trigPin to HIGH to start sending ultrasonic sound
@@ -198,7 +198,7 @@ void loop() {
   Serial.print("Distance: ");            // Print the result to the serial monitor
   Serial.println(distance);
 
-  delay(100);                            // pause 100ms till the next measurement*/
+  delay(100);                            // pause 100ms till the next measurement
 
   // Just chill
   server.handleClient();
