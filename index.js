@@ -98,7 +98,7 @@ exports.getDownloadUrl = async ( req, res ) => {
           fullname,
           version,
           createdAt
-        FROM \`oil-tank-298920.ota.firmwares\`
+        FROM \`weuiot.ota.firmwares\`
         where variant = @variant
         order by createdAt desc
         limit 1      
