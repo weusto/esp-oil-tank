@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <ArduinoJson.h>
 #include <Client.h>
 #include <WiFiClientSecure.h>
 #include <MQTT.h>
@@ -21,6 +22,7 @@
 #endif
 
 #include <WiFiManager.h>
+#include <UniversalTelegramBot.h>
 
 #define USE_SERIAL Serial
 
@@ -42,14 +44,14 @@ WebServer server(80);
 #endif
 
 // Wifi
-const char *ssid = "WIFI-WEU-IOT";
-const char *password = "UCs8UibE88fKa2RrueGF";
+const char *ssid = "";
+const char *password = "";
 
 // Cloud IoT
 const char *project_id = "weuiot";
 const char *location = "us-central1";
 const char *registry_id = "weuiot-registry";
-const char *device_id = "esp32-1";
+const char *device_id = "esp-1";
 
 // NTP
 const char* ntp_primary = "pool.ntp.org";
@@ -63,6 +65,13 @@ const char* private_key_str =
 const int jwt_exp_secs = 3600; // Maximum 24H (3600*24)
 const int ex_num_topics = 0;
 const char* ex_topics[ex_num_topics];
+
+float TANK_HEIGHT_IN_CM = 0;
+float TANK_LENGTH_IN_CM = 0;
+float TANK_WIDTH_IN_CM = 0;
+float FULL_VOLUME_IN_LITERS = 1;
+String UNIT;
+
 
 Client *netClient;
 CloudIoTCoreDevice *device;
@@ -80,13 +89,40 @@ void publishTelemetry(String data);
 void publishTelemetry(String subfolder, String data);
 void connect();
 void setupCloudIoT();
+void getTankLevel();
+
+// Initialize Telegram BOT
+#define BOTtoken "1475527759:AAEuQSvWrhafu8dNrzGzaHmBpQx-80TqT34"  // your Bot Token (Get from Botfather)
+
+// Use @myidbot to find out the chat ID of an individual or a group
+// Also note that you need to click "start" on a bot before it can
+// message you
+String CHAT_ID = "";
+
+WiFiClientSecure clientSecure;
+UniversalTelegramBot bot(BOTtoken, clientSecure);
+
+bool telegramNotificationTankFullSent = false;
+bool telegramNotificationTankEmptySent = false;
 
 void messageReceived(String &topic, String &payload) 
 {
-  Serial.println("<- " + topic + " - " + payload);
+  USE_SERIAL.println("<- " + topic + " - " + payload);
+  
+  if(topic == "/devices/" + String(device_id) + "/config") {
+    DynamicJsonDocument doc(1024);
+    deserializeJson(doc, payload);
+    JsonObject obj = doc.as<JsonObject>();
+
+    FULL_VOLUME_IN_LITERS = obj["full_volume_in_liters"];
+    TANK_HEIGHT_IN_CM = obj["tank_height_in_cm"];
+    TANK_LENGTH_IN_CM = obj["tank_lenght_in_cm"];
+    TANK_WIDTH_IN_CM = obj["tank_width_in_cm"];
+    UNIT = (const char*)obj["unit"];
+
+    CHAT_ID = (const char*)obj["telegram_chat_id"];
+  }
 }
-
-
 
 /* 
  * Check if needs to update the device and returns the download url.
@@ -225,7 +261,10 @@ const int trigPin = 16;   // trigger pin
 const int echoPin = 17;   // echo pin
 
 float duration;           // variable to store the duration as float
+int waterFilllevel = 0;
 float distance;           // variable to store the distance as float
+int tank_volume = 0;
+int tank_percent = 0;
 
 /* 
  * Show current device version
@@ -235,14 +274,14 @@ void handleRoot() {
 }
 
 void setup() {
-  Serial.begin(115200);
-  Serial.setDebugOutput(true);  
+  USE_SERIAL.begin(115200);
+  USE_SERIAL.setDebugOutput(true);  
   pinMode(LED_BUILTIN, OUTPUT);
   pinMode(trigPin, OUTPUT);             // set the trigger pin as output
   pinMode(echoPin, INPUT);               // set the echo pin as input
 
   delay(3000);
-  Serial.println("\n Starting");
+  USE_SERIAL.println("\n Starting");
   // Setup Wifi Manager
   String version = String("<p>Current Version - v") + String(CURRENT_VERSION) + String("</p>");
   USE_SERIAL.println(version);
@@ -252,7 +291,7 @@ void setup() {
   wm.addParameter(&versionText);    
     
   if (!wm.autoConnect()) {
-    Serial.println("failed to connect and hit timeout");
+    USE_SERIAL.println("failed to connect and hit timeout");
     //reset and try again, or maybe put it to deep sleep
     ESP.restart();
     delay(1000);
@@ -291,30 +330,73 @@ void loop() {
   {
     lastMillis = millis();
 
-    // réaliser une acquisition des mesures
-    digitalWrite(trigPin, LOW);            // set the trigPin to LOW
-    delayMicroseconds(2);                  // wait 2ms to make sure the trigPin is LOW
-
-    digitalWrite(trigPin, HIGH);           // set the trigPin to HIGH to start sending ultrasonic sound
-    delayMicroseconds(10);                 // pause 10ms
-    digitalWrite(trigPin, LOW);            // set the trigPin to LOW to stop sending ultrasonic sound
-
-    duration = pulseIn(echoPin, HIGH);     // request how long the echoPin has been HIGH
-    distance = (duration * 0.0343) / 2;    // calculate the distance based on the speed of sound
-                                          // we need to divide by 2 since the sound travelled the distance twice
-    USE_SERIAL.println("Distance #: " + String(distance));           // Print the result to the serial monitor
-
-    delay(100);                            // pause 100ms till the next measurement
-
-    String payload = String("{\"timestamp\":") + time(nullptr) +
-                     String(",\"distance\":") + distance +
-                     String("}");
-    publishTelemetry(payload);
-    Serial.println("publishTelemetry -> " + payload);
+    getTankLevel();    
   }
 
   // Just chill
   server.handleClient();
+}
+
+void getTankLevel()
+{
+  // Clear the trigPin by setting it LOW:
+  digitalWrite(trigPin, LOW);
+
+  // wait 2ms to make sure the trigPin is LOW
+  delayMicroseconds(2);
+
+  // Trigger the sensor by setting the trigPin high for 10 microseconds:
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+
+  // Read the echoPin. pulseIn() returns the duration (length of the pulse) in microseconds:
+  duration = pulseIn(echoPin, HIGH);
+  distance = (duration * 0.0343) / 2;  // calculate the distance based on the speed of sound
+                                       // we need to divide by 2 since the sound travelled the distance twice
+
+  USE_SERIAL.println("Distance #: " + String(distance) + "cm");
+
+  waterFilllevel = TANK_HEIGHT_IN_CM - distance;
+
+  USE_SERIAL.println("Calcul #: " + String((TANK_LENGTH_IN_CM * TANK_WIDTH_IN_CM * waterFilllevel) / 1000) + "liter");
+
+  if (distance >= TANK_HEIGHT_IN_CM) {
+    tank_volume = 0;
+    tank_percent = 0;
+  }
+
+  if (distance < 10 && distance > 0 && !telegramNotificationTankFullSent) {
+    tank_volume = FULL_VOLUME_IN_LITERS;
+    tank_percent = 100;
+
+    bot.sendMessage(CHAT_ID, "La citerne est pleine!", "");
+    telegramNotificationTankFullSent = true;
+    telegramNotificationTankEmptySent = false;
+  }
+
+  if (distance >= 10 && distance <= TANK_HEIGHT_IN_CM) {
+    tank_volume = (TANK_LENGTH_IN_CM * TANK_WIDTH_IN_CM * waterFilllevel) / 1000;
+    tank_percent = (((float)tank_volume / FULL_VOLUME_IN_LITERS) * 100);
+  }
+
+  if(tank_percent < 20 && !telegramNotificationTankEmptySent) {
+    bot.sendMessage(CHAT_ID, "La citerne est vide!!!", "");
+    telegramNotificationTankFullSent = false;
+    telegramNotificationTankEmptySent = true;
+  }
+
+  String payload = /*String("{\"timestamp\":") + time(nullptr) +*/
+                     String("{\"current_volume_in_liters\":") + tank_volume +
+                     String(",\"current_volume_in_percent\":") + tank_percent +
+                     String(",\"full_volume_in_liters\":") + FULL_VOLUME_IN_LITERS +
+                     String(",\"on\":") + "true" +
+                     String(",\"tank_height_in_cm\":") + TANK_HEIGHT_IN_CM +
+                     String(",\"tank_lenght_in_cm\":") + TANK_LENGTH_IN_CM +
+                     String(",\"tank_width_in_cm\":") + TANK_WIDTH_IN_CM +
+                     String("}");
+  publishTelemetry(payload);
+  USE_SERIAL.println("publishTelemetry -> " + payload);
 }
 
 String getDefaultSensor()
@@ -325,7 +407,7 @@ String getDefaultSensor()
 String getJwt()
 {
   iss = time(nullptr);
-  Serial.println("Refreshing JWT");
+  USE_SERIAL.println("Refreshing JWT");
   jwt = device->createJWT(iss, jwt_exp_secs);
   return jwt;
 }
@@ -351,7 +433,7 @@ void connectWifi()
 {
   while (WiFi.status() != WL_CONNECTED) 
   {
-    //Serial.print(".");
+    //USE_SERIAL.print(".");
     delay(1000);
   }
 }
