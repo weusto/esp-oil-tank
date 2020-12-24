@@ -1,23 +1,19 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
-#include <Client.h>
-#include <WiFiClientSecure.h>
-#include <MQTT.h>
-#include <CloudIoTCore.h>
-#include <CloudIoTCoreMqtt.h>
-#include "ca_crt.h"
 
 #include <DNSServer.h>
 #if defined(ESP8266)
 #include <ESP8266WebServer.h>
 #include <ESP8266WiFi.h>
 #include <ESP8266HTTPClient.h>
+#include "google-cloud-iot-arduino/Esp8266-lwmqtt/esp8266_mqtt.h"
 #define VARIANT "esp8266"
 #else
 #include <WebServer.h>
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <Update.h>
+#include "google-cloud-iot-arduino/Esp32-lwmqtt/esp32-mqtt.h"
 #define VARIANT "esp32"
 #endif
 
@@ -26,15 +22,8 @@
 
 #define USE_SERIAL Serial
 
-#define DEBUG //!< active le mode débogage
-
 #define CURRENT_VERSION VERSION
 #define CLOUD_FUNCTION_URL "https://us-central1-oil-tank-298920.cloudfunctions.net/getDownloadUrl"
-
-// Périodes
-#define PERIODE_ACQUISITION 500     //!< période d'acquisition en millisecondes pour la sonde
-#define PERIODE_ENVOI       60000    //!< période d'envoi des données en millisecondes pour MQTT
-
 
 WiFiClient client;
 #if defined(ESP8266)
@@ -43,28 +32,11 @@ ESP8266WebServer server(80);
 WebServer server(80);
 #endif
 
-// Wifi
-const char *ssid = "";
-const char *password = "";
-
-// Cloud IoT
-const char *project_id = "weuiot";
-const char *location = "us-central1";
-const char *registry_id = "weuiot-registry";
-const char *device_id = "esp-1";
-
-// NTP
-const char* ntp_primary = "pool.ntp.org";
-const char* ntp_secondary = "time.nist.gov";
-
-const char* private_key_str =
-  "bc:fd:9d:07:38:7f:1f:b6:3a:1c:b7:5c:01:aa:c1:"
-  "d6:fe:18:03:c1:da:0c:7d:a8:af:4e:56:c5:61:be:"
-  "1c:4e";
-
-const int jwt_exp_secs = 3600; // Maximum 24H (3600*24)
-const int ex_num_topics = 0;
-const char* ex_topics[ex_num_topics];
+// Périodes
+#define PERIODE_ACQUISITION 500     //!< période d'acquisition en millisecondes pour la sonde
+#define PERIODE_ENVOI       60000    //!< période d'envoi des données en millisecondes pour MQTT
+unsigned long lastMillis = 0;
+int ledState = LOW;
 
 float TANK_HEIGHT_IN_CM = 0;
 float TANK_LENGTH_IN_CM = 0;
@@ -72,23 +44,6 @@ float TANK_WIDTH_IN_CM = 0;
 float FULL_VOLUME_IN_LITERS = 1;
 String UNIT;
 
-
-Client *netClient;
-CloudIoTCoreDevice *device;
-CloudIoTCoreMqtt *mqtt;
-MQTTClient *mqttClient;
-unsigned long iss = 0;
-String jwt;
-unsigned long lastMillis = 0;
-
-String getDefaultSensor();
-String getJwt();
-void setupWifi();
-void connectWifi();
-void publishTelemetry(String data);
-void publishTelemetry(String subfolder, String data);
-void connect();
-void setupCloudIoT();
 void getTankLevel();
 
 // Initialize Telegram BOT
@@ -277,9 +232,7 @@ void setup() {
   USE_SERIAL.begin(115200);
   USE_SERIAL.setDebugOutput(true);  
   pinMode(LED_BUILTIN, OUTPUT);
-  pinMode(trigPin, OUTPUT);             // set the trigger pin as output
-  pinMode(echoPin, INPUT);               // set the echo pin as input
-
+  
   delay(3000);
   USE_SERIAL.println("\n Starting");
   // Setup Wifi Manager
@@ -312,23 +265,29 @@ void setup() {
   server.begin();
   USE_SERIAL.println("HTTP server started");
 
-  setupCloudIoT();
   USE_SERIAL.print("IP address: ");
   USE_SERIAL.println(WiFi.localIP());
+
+  setupCloudIoT();
+
+  pinMode(trigPin, OUTPUT); // set the trigger pin as output
+  pinMode(echoPin, INPUT);  // set the echo pin as input
 }
 
-void loop() {
-  mqttClient->loop();
-  delay(100);  // <- fixes some issues with WiFi stability
 
-  if (!mqttClient->connected())
-  {
+
+void loop() {
+  mqtt->loop();
+  delay(10);  // <- fixes some issues with WiFi stability
+  if (!mqttClient->connected()) {
     connect();
   }
 
   if (millis() - lastMillis > PERIODE_ENVOI)
   {
     lastMillis = millis();
+    ledState = ledState == LOW ? HIGH : LOW;
+    digitalWrite( BUILTIN_LED, ledState );
 
     getTankLevel();    
   }
@@ -397,74 +356,4 @@ void getTankLevel()
                      String("}");
   publishTelemetry(payload);
   USE_SERIAL.println("publishTelemetry -> " + payload);
-}
-
-String getDefaultSensor()
-{
-  return  "Wifi: " + String(WiFi.RSSI()) + "db";
-}
-
-String getJwt()
-{
-  iss = time(nullptr);
-  USE_SERIAL.println("Refreshing JWT");
-  jwt = device->createJWT(iss, jwt_exp_secs);
-  return jwt;
-}
-
-void setupWifi()
-{
-  WiFi.mode(WIFI_STA);
-  // WiFi.setSleep(false); // May help with disconnect? Seems to have been removed from WiFi
-  WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED) 
-  {
-    delay(100);
-  }
-
-  configTime(0, 0, ntp_primary, ntp_secondary);
-  while (time(nullptr) < 1510644967) 
-  {
-    delay(10);
-  }
-}
-
-void connectWifi()
-{
-  while (WiFi.status() != WL_CONNECTED) 
-  {
-    //USE_SERIAL.print(".");
-    delay(1000);
-  }
-}
-
-///////////////////////////////
-// Orchestrates various methods from preceeding code.
-///////////////////////////////
-void publishTelemetry(String data)
-{
-  mqtt->publishTelemetry(data);
-}
-
-void publishTelemetry(String subfolder, String data)
-{
-  mqtt->publishTelemetry(subfolder, data);
-}
-
-void connect()
-{
-  connectWifi();
-  mqtt->mqttConnect();
-}
-
-void setupCloudIoT()
-{
-  device = new CloudIoTCoreDevice(project_id, location, registry_id, device_id, private_key_str);
-
-  setupWifi();
-  netClient = new WiFiClientSecure();
-  mqttClient = new MQTTClient(512);
-  mqttClient->setOptions(180, true, 1000); // keepAlive, cleanSession, timeout
-  mqtt = new CloudIoTCoreMqtt(mqttClient, netClient, device);
-  mqtt->startMQTT();
 }
