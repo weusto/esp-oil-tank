@@ -1,7 +1,10 @@
 steps:
-- name: 'infinitecoding/platformio-for-ci:latest'  
+- name: 'python:2.7'  
   dir: .
-  args: ['run -d /workspace/']  
+  args:
+    - -c
+    - 'pip install -U platformio'
+    - 'platformio run'
 artifacts: 
   objects: 
     location: 'gs://$PROJECT_ID-firmwares/$TAG_NAME'
