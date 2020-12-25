@@ -1,13 +1,7 @@
 steps:
 - name: 'sglahn/platformio-core:3.6.0'  
   dir: .
-  args:
-  - |
-    pio lib install "bblanchon/ArduinoJson@6.17.2"
-    pio lib install "256dpi/MQTT@2.4.8"
-    pio lib install "googlecloudplatform/Google Cloud IoT Core JWT@1.1.11"
-    pio lib install "witnessmenow/UniversalTelegramBot@1.3.0"
-  - 'run'  
+  args: ['run']  
 artifacts: 
   objects: 
     location: 'gs://$PROJECT_ID-firmwares/$TAG_NAME'
