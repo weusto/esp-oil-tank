@@ -1,5 +1,5 @@
 steps:
-- name: 'python:3.8.7-slim'
+- name: 'python:3.8.7'
   entrypoint: /bin/sh
   dir: .
   args:
