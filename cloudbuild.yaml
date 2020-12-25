@@ -1,7 +1,7 @@
 steps:
 - name: 'infinitecoding/platformio-for-ci:latest'  
   dir: .
-  args: ['run']  
+  args: ['run -d /workspace/']  
 artifacts: 
   objects: 
     location: 'gs://$PROJECT_ID-firmwares/$TAG_NAME'
