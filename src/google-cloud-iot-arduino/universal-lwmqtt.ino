@@ -12,60 +12,34 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *****************************************************************************/
-
-#if defined(ARDUINO_SAMD_MKR1000) or defined(ESP32)
-#define __SKIP_ESP8266__
-#endif
-
-#if defined(ESP8266)
-#define __ESP8266_MQTT__
-#endif
-
-#ifdef __SKIP_ESP8266__
-
-#include <Arduino.h>
-
-void setup(){
-  Serial.begin(115200);
+// !!REPLACEME!!
+// The MQTT callback function for commands and configuration updates
+// Place your message handler code here.
+void messageReceived(String &topic, String &payload) {
+  Serial.println("incoming: " + topic + " - " + payload);
 }
 
-void loop(){
-  Serial.println("Hello World");
-}
+#include "universal-mqtt.h"
 
-#endif
-
-#ifdef __ESP8266_MQTT__
-#include <CloudIoTCore.h>
-#include "esp8266_mqtt.h"
-
-#ifndef LED_BUILTIN
-#define LED_BUILTIN 13
-#endif
-
-void setup()
-{
+void setup() {
   // put your setup code here, to run once:
   Serial.begin(115200);
-  setupCloudIoT(); // Creates globals for MQTT
   pinMode(LED_BUILTIN, OUTPUT);
+  setupCloudIoT();
 }
 
-static unsigned long lastMillis = 0;
-void loop()
-{
-  if (!mqtt->loop())
-  {
-    mqtt->mqttConnect();
+unsigned long lastMillis = 0;
+void loop() {
+  mqtt->loop();
+  delay(10);  // <- fixes some issues with WiFi stability
+
+  if (!mqttClient->connected()) {
+    connect();
   }
 
-  delay(10); // <- fixes some issues with WiFi stability
-
-  // TODO: Replace with your code here
-  if (millis() - lastMillis > 60000)
-  {
+  // publish a message roughly every second.
+  if (millis() - lastMillis > 1000) {
     lastMillis = millis();
     publishTelemetry(getDefaultSensor());
   }
 }
-#endif

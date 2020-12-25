@@ -1,5 +1,5 @@
 /******************************************************************************
- * Copyright 2018 Google
+ * Copyright 2019 Google
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -14,19 +14,27 @@
  *****************************************************************************/
 // This file contains your configuration used to connect to Cloud IoT Core
 
-// WIFI
-const char* ssid = "SSID";
-const char* password = "PASSWORD";
+// Important!
+// TODO(you): Install root certificate to verify tls connection as described
+// in https://www.hackster.io/arichetta/add-ssl-certificates-to-mkr1000-93c89d
+
+// Wifi network details.
+const char* ssid = "";
+const char* password = "";
 
 // Cloud iot details.
-const char* project_id = "project-id";
+const char* project_id = "weuiot";
 const char* location = "us-central1";
-const char* registry_id = "my-registry";
-const char* device_id = "my-device";
+const char* registry_id = "weuiot-registry";
+const char* device_id = "esp-1";
 
 // Configuration for NTP
-const char* ntp_primary = "time.google.com";
-const char* ntp_secondary = "pool.ntp.org";
+const char* ntp_primary = "pool.ntp.org";
+const char* ntp_secondary = "time.nist.gov";
+
+#ifndef LED_BUILTIN
+#define LED_BUILTIN 13
+#endif
 
 // To get the private key run (where private-key.pem is the ec private key
 // used to create the certificate uploaded to google cloud iot):
@@ -36,15 +44,16 @@ const char* ntp_secondary = "pool.ntp.org";
 // of hex digits). If it's bigger and it starts with "00:" delete the "00:". If
 // it's smaller add "00:" to the start. If it's too big or too small something
 // is probably wrong with your key.
-const unsigned char private_key[] = {
-  0x5a, 0x2e, 0x06, 0xb5, 0xc1, 0xf2, 0x9c, 0xb3, 0x77, 0xb2, 0x89, 0xf5, 0x29, 0x29, 0x93,
-  0x07, 0xfd, 0xed, 0x22, 0x0d, 0x03, 0x2b, 0xa6, 0xb1, 0xb6, 0x04, 0x0b, 0xd5, 0x9b, 0x49,
-  0x7d, 0xca};
+const char* private_key_str =
+    "bc:fd:9d:07:38:7f:1f:b6:3a:1c:b7:5c:01:aa:c1:"
+    "d6:fe:18:03:c1:da:0c:7d:a8:af:4e:56:c5:61:be:"
+    "1c:4e";
 
 // Time (seconds) to expire token += 20 minutes for drift
 const int jwt_exp_secs = 3600; // Maximum 24H (3600*24)
 
-// Certificates for SSL on the LTS server
+// Use the root certificate to verify tls connection rather than
+// using a fingerprint.
 const char* primary_ca = "-----BEGIN CERTIFICATE-----\n"
     "MIIBxTCCAWugAwIBAgINAfD3nVndblD3QnNxUDAKBggqhkjOPQQDAjBEMQswCQYD\n"
     "VQQGEwJVUzEiMCAGA1UEChMZR29vZ2xlIFRydXN0IFNlcnZpY2VzIExMQzERMA8G\n"

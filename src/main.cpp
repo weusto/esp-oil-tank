@@ -6,18 +6,17 @@
 #include <ESP8266WebServer.h>
 #include <ESP8266WiFi.h>
 #include <ESP8266HTTPClient.h>
-#include "google-cloud-iot-arduino/Esp8266-lwmqtt/esp8266_mqtt.h"
 #define VARIANT "esp8266"
 #else
 #include <WebServer.h>
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <Update.h>
-#include "google-cloud-iot-arduino/Esp32-lwmqtt/esp32-mqtt.h"
 #define VARIANT "esp32"
 #endif
 
 #include <WiFiManager.h>
+#include "google-cloud-iot-arduino/universal-mqtt.h"
 #include <UniversalTelegramBot.h>
 
 #define USE_SERIAL Serial
