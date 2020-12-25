@@ -1,11 +1,19 @@
 steps:
 - name: 'python:3.8.7-slim'
+  id: INSTALL
+  entrypoint: python3
   dir: .
-  entrypoint: /bin/sh
   args:
     - -c
     - 'pip install -U platformio'
-    - 'platformio run'
+- name: python:3.8.7-slim
+  id: RUN
+  entrypoint: python3
+  dir: .
+  args:
+  - 'platformio run'
+  waitFor:
+  - INSTALL
 artifacts: 
   objects: 
     location: 'gs://$PROJECT_ID-firmwares/$TAG_NAME'
