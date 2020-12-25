@@ -1,6 +1,7 @@
 steps:
-- name: 'python:2.7'  
+- name: 'python:2.7'
   dir: .
+  entrypoint: /bin/sh
   args:
     - -c
     - 'pip install -U platformio'
